@@ -36,4 +36,73 @@ declare global {
       isElectron: boolean;
     };
   }
+
+  /** Available only in secure contexts. */
+  interface FileSystemDirectoryHandle extends FileSystemHandle {
+    readonly kind: 'directory';
+    getDirectoryHandle(name: string, options?: FileSystemGetDirectoryOptions): Promise<FileSystemDirectoryHandle>;
+    getFileHandle(name: string, options?: FileSystemGetFileOptions): Promise<FileSystemFileHandle>;
+    removeEntry(name: string, options?: FileSystemRemoveOptions): Promise<void>;
+    resolve(possibleDescendant: FileSystemHandle): Promise<string[] | null>;
+  }
+
+  declare var FileSystemDirectoryHandle: {
+    prototype: FileSystemDirectoryHandle;
+    new (): FileSystemDirectoryHandle;
+  };
+
+  /** Available only in secure contexts. */
+  interface FileSystemFileHandle extends FileSystemHandle {
+    readonly kind: 'file';
+    createSyncAccessHandle(): Promise<FileSystemSyncAccessHandle>;
+    getFile(): Promise<File>;
+  }
+
+  declare var FileSystemFileHandle: {
+    prototype: FileSystemFileHandle;
+    new (): FileSystemFileHandle;
+  };
+
+  /** Available only in secure contexts. */
+  interface FileSystemHandle {
+    readonly kind: FileSystemHandleKind;
+    readonly name: string;
+    isSameEntry(other: FileSystemHandle): Promise<boolean>;
+  }
+
+  declare var FileSystemHandle: {
+    prototype: FileSystemHandle;
+    new (): FileSystemHandle;
+  };
+
+  interface FileSystemGetDirectoryOptions {
+    create?: boolean;
+  }
+
+  interface FileSystemGetFileOptions {
+    create?: boolean;
+  }
+
+  interface FileSystemReadWriteOptions {
+    at?: number;
+  }
+
+  interface FileSystemRemoveOptions {
+    recursive?: boolean;
+  }
+
+  /** Available only in secure contexts. */
+  interface FileSystemSyncAccessHandle {
+    close(): void;
+    flush(): void;
+    getSize(): number;
+    read(buffer: BufferSource, options?: FileSystemReadWriteOptions): number;
+    truncate(newSize: number): void;
+    write(buffer: BufferSource, options?: FileSystemReadWriteOptions): number;
+  }
+
+  declare var FileSystemSyncAccessHandle: {
+    prototype: FileSystemSyncAccessHandle;
+    new (): FileSystemSyncAccessHandle;
+  };
 }

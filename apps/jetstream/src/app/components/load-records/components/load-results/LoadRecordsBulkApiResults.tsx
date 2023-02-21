@@ -1,6 +1,6 @@
 import { css } from '@emotion/react';
 import { logger } from '@jetstream/shared/client-logger';
-import { ANALYTICS_KEYS } from '@jetstream/shared/constants';
+import { ANALYTICS_KEYS, INDEXED_DB } from '@jetstream/shared/constants';
 import { bulkApiGetJob, bulkApiGetRecords } from '@jetstream/shared/data';
 import { checkIfBulkApiJobIsDone, convertDateToLocale, useBrowserNotifications, useRollbar } from '@jetstream/shared/ui-utils';
 import { getSuccessOrFailureChar, pluralizeFromNumber } from '@jetstream/shared/utils';
@@ -14,8 +14,10 @@ import {
   WorkerMessage,
 } from '@jetstream/types';
 import { FileDownloadModal, Grid, ProgressRing, SalesforceLogin, Spinner } from '@jetstream/ui';
+import localforage from 'localforage';
 import { FunctionComponent, useEffect, useRef, useState } from 'react';
 import { useRecoilState } from 'recoil';
+import { v4 as uuid } from 'uuid';
 import { applicationCookieState } from '../../../../app-state';
 import { useAmplitude } from '../../../core/analytics';
 import * as fromJetstreamEvents from '../../../core/jetstream-events';
@@ -27,6 +29,7 @@ import {
   FieldMapping,
   LoadDataBulkApiStatusPayload,
   LoadDataPayload,
+  LoadHistoryItem,
   PrepareDataPayload,
   PrepareDataResponse,
   ViewModalData,
@@ -99,8 +102,8 @@ export const LoadRecordsBulkApiResults: FunctionComponent<LoadRecordsBulkApiResu
   const [downloadError, setDownloadError] = useState<string>(null);
   const [jobInfo, setJobInfo] = useState<BulkJobWithBatches>();
   const [batchSummary, setBatchSummary] = useState<LoadDataBulkApiStatusPayload>();
-  const [processingStartTime, setProcessingStartTime] = useState<string>(null);
-  const [processingEndTime, setProcessingEndTime] = useState<string>(null);
+  const [startTime, setStartTime] = useState<string>(null);
+  const [endTime, setEndTime] = useState<string>(null);
   // Salesforce changes order of batches, so we want to ensure order is retained based on the input file
   const [batchIdByIndex, setBatchIdByIndex] = useState<MapOf<number>>();
   const [intervalCount, setIntervalCount] = useState<number>(0);
@@ -143,9 +146,10 @@ export const LoadRecordsBulkApiResults: FunctionComponent<LoadRecordsBulkApiResu
   useEffect(() => {
     if (loadWorker) {
       setStatus(STATUSES.PREPARING);
-      setProcessingStartTime(convertDateToLocale(new Date(), { timeStyle: 'medium' }));
+      setStartTime(convertDateToLocale(new Date(), { timeStyle: 'medium' }));
       setFatalError(null);
       const data: PrepareDataPayload = {
+        uuid: uuid(),
         org: selectedOrg,
         data: inputFileData,
         // zipData: inputZipFileData,
@@ -163,6 +167,7 @@ export const LoadRecordsBulkApiResults: FunctionComponent<LoadRecordsBulkApiResu
   useEffect(() => {
     if (preparedData && preparedData.data.length) {
       const data: LoadDataPayload = {
+        uuid: uuid(),
         org: selectedOrg,
         data: preparedData.data,
         zipData: inputZipFileData,
@@ -188,6 +193,7 @@ export const LoadRecordsBulkApiResults: FunctionComponent<LoadRecordsBulkApiResu
       const isDone = checkIfBulkApiJobIsDone(jobInfo, batchSummary.totalBatches);
       if (isDone) {
         setStatus(STATUSES.FINISHED);
+        handleSaveHistory();
         const numSuccess = jobInfo.numberRecordsProcessed - jobInfo.numberRecordsFailed;
         const numFailure = jobInfo.numberRecordsFailed + preparedData.errors.length;
         onFinish({ success: numSuccess, failure: numFailure });
@@ -265,7 +271,7 @@ export const LoadRecordsBulkApiResults: FunctionComponent<LoadRecordsBulkApiResu
               // processing failed on every record
               setStatus(STATUSES.ERROR);
               setPreparedData(payload.data.preparedData);
-              setProcessingEndTime(dateString);
+              setEndTime(dateString);
               // mock response to ensure results table is visible
               setJobInfo({
                 concurrencyMode: serialMode ? 'Serial' : 'Parallel',
@@ -304,7 +310,7 @@ export const LoadRecordsBulkApiResults: FunctionComponent<LoadRecordsBulkApiResu
             } else {
               setStatus(STATUSES.UPLOADING);
               setPreparedData(payload.data.preparedData);
-              setProcessingEndTime(dateString);
+              setEndTime(dateString);
             }
             break;
           }
@@ -369,6 +375,42 @@ export const LoadRecordsBulkApiResults: FunctionComponent<LoadRecordsBulkApiResu
       return '';
     }
     return `Uploading batch ${batchSummary.batchSummary.filter((item) => item.completed).length + 1} of ${batchSummary.totalBatches}`;
+  }
+
+  async function handleSaveHistory() {
+    try {
+      const historyItems = (await localforage.getItem<MapOf<LoadHistoryItem>>(INDEXED_DB.KEYS.loadHistory)) || {};
+      const historyItem: LoadHistoryItem = {
+        key: `${selectedOrg.uniqueId}:${preparedData.uuid}`,
+        uuid: preparedData.uuid,
+        date: new Date(),
+        bulkJobId: jobInfo.id,
+        resultsDataId: null,
+        org: selectedOrg.uniqueId,
+        sObject: selectedSObject,
+        apiMode,
+        operation: loadType,
+        batchSize,
+        serialMode,
+        externalId,
+        insertNulls,
+        dateFormat,
+        assignmentRuleId,
+        fieldMapping,
+        startTime,
+        endTime,
+        total: jobInfo.numberRecordsProcessed,
+        success: jobInfo.numberRecordsProcessed - jobInfo.numberRecordsFailed,
+        failure: jobInfo.numberRecordsFailed,
+        errors: preparedData.errors,
+      };
+
+      historyItems[historyItem.key] = historyItem;
+
+      await localforage.setItem<MapOf<LoadHistoryItem>>(INDEXED_DB.KEYS.loadHistory, historyItems);
+    } catch (ex) {
+      logger.warn('Could not save history item', ex);
+    }
   }
 
   async function handleDownloadOrViewRecords(
@@ -536,8 +578,8 @@ export const LoadRecordsBulkApiResults: FunctionComponent<LoadRecordsBulkApiResu
         <LoadRecordsBulkApiResultsTable
           jobInfo={jobInfo}
           processingErrors={preparedData.errors}
-          processingStartTime={processingStartTime}
-          processingEndTime={processingEndTime}
+          processingStartTime={startTime}
+          processingEndTime={endTime}
           onDownloadOrView={handleDownloadOrViewRecords}
           onDownloadProcessingErrors={handleDownloadProcessingErrors}
         />

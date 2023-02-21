@@ -1,12 +1,14 @@
 import { css } from '@emotion/react';
 import { logger } from '@jetstream/shared/client-logger';
-import { ANALYTICS_KEYS } from '@jetstream/shared/constants';
+import { ANALYTICS_KEYS, INDEXED_DB } from '@jetstream/shared/constants';
 import { convertDateToLocale, useBrowserNotifications, useRollbar } from '@jetstream/shared/ui-utils';
 import { flattenRecord, getSuccessOrFailureChar, pluralizeFromNumber } from '@jetstream/shared/utils';
-import { InsertUpdateUpsertDelete, RecordResultWithRecord, SalesforceOrgUi, WorkerMessage } from '@jetstream/types';
+import { InsertUpdateUpsertDelete, MapOf, RecordResultWithRecord, SalesforceOrgUi, WorkerMessage } from '@jetstream/types';
 import { FileDownloadModal, Grid, ProgressRing, Spinner } from '@jetstream/ui';
+import localforage from 'localforage';
 import { FunctionComponent, useEffect, useRef, useState } from 'react';
 import { useRecoilState } from 'recoil';
+import { v4 as uuid } from 'uuid';
 import { applicationCookieState } from '../../../../app-state';
 import { useAmplitude } from '../../../core/analytics';
 import * as fromJetstreamEvents from '../../../core/jetstream-events';
@@ -16,11 +18,13 @@ import {
   FieldMapping,
   LoadDataBatchApiProgress,
   LoadDataPayload,
+  LoadHistoryFileItem,
+  LoadHistoryItem,
   PrepareDataPayload,
   PrepareDataResponse,
   ViewModalData,
 } from '../../load-records-types';
-import { getFieldHeaderFromMapping } from '../../utils/load-records-utils';
+import { getFieldHeaderFromMapping, getRecordsForDownloadBatchApi } from '../../utils/load-records-utils';
 import { getLoadWorker } from '../../utils/load-records-worker';
 import LoadRecordsBatchApiResultsTable from './LoadRecordsBatchApiResultsTable';
 import LoadRecordsResultsModal from './LoadRecordsResultsModal';
@@ -110,6 +114,7 @@ export const LoadRecordsBatchApiResults: FunctionComponent<LoadRecordsBatchApiRe
       setProcessingStartTime(convertDateToLocale(new Date(), { timeStyle: 'medium' }));
       setFatalError(null);
       const data: PrepareDataPayload = {
+        uuid: uuid(),
         org: selectedOrg,
         data: inputFileData,
         fieldMapping,
@@ -126,6 +131,7 @@ export const LoadRecordsBatchApiResults: FunctionComponent<LoadRecordsBatchApiRe
   useEffect(() => {
     if (preparedData && preparedData.data.length) {
       const data: LoadDataPayload = {
+        uuid: preparedData.uuid,
         org: selectedOrg,
         data: preparedData.data,
         sObject: selectedSObject,
@@ -156,7 +162,8 @@ export const LoadRecordsBatchApiResults: FunctionComponent<LoadRecordsBatchApiRe
   }, [preparedData, processedRecords]);
 
   useEffect(() => {
-    if (status === STATUSES.FINISHED && preparedData) {
+    if (status === STATUSES.FINISHED && preparedData && processingStatus.total) {
+      handleSaveHistory();
       const numSuccess = processingStatus.success;
       const numFailure = processingStatus.failure + preparedData.errors.length;
       notifyUser(`Your ${loadType.toLowerCase()} data load is finished`, {
@@ -260,31 +267,60 @@ export const LoadRecordsBatchApiResults: FunctionComponent<LoadRecordsBatchApiRe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadWorker, processingStatusRef.current]);
 
+  async function handleSaveHistory() {
+    try {
+      const historyItemFileKeys = (await localforage.getItem<MapOf<string>>(INDEXED_DB.KEYS.loadHistoryKeys)) || {};
+      const historyItems = (await localforage.getItem<MapOf<LoadHistoryItem>>(INDEXED_DB.KEYS.loadHistory)) || {};
+      const historyItem: LoadHistoryItem = {
+        key: `${selectedOrg.uniqueId}:${preparedData.uuid}`,
+        uuid: preparedData.uuid,
+        date: new Date(),
+        bulkJobId: null,
+        resultsDataId: `${INDEXED_DB.KEYS.loadHistory}:${preparedData.uuid}:RESULTS`,
+        org: selectedOrg.uniqueId,
+        sObject: selectedSObject,
+        apiMode,
+        operation: loadType,
+        batchSize,
+        serialMode,
+        externalId,
+        insertNulls,
+        dateFormat,
+        assignmentRuleId,
+        fieldMapping,
+        startTime,
+        endTime,
+        total: processingStatus.total,
+        success: processingStatus.success,
+        failure: processingStatus.failure,
+        errors: preparedData.errors,
+      };
+
+      historyItems[historyItem.key] = historyItem;
+      historyItemFileKeys[historyItem.resultsDataId] = historyItem.resultsDataId;
+
+      await localforage.setItem<MapOf<LoadHistoryItem>>(INDEXED_DB.KEYS.loadHistory, historyItems);
+      await localforage.setItem<LoadHistoryFileItem>(historyItem.resultsDataId, {
+        key: historyItem.resultsDataId,
+        data: processedRecords,
+        parentUuid: historyItem.uuid,
+        type: 'INPUT',
+      });
+      await localforage.setItem<MapOf<string>>(INDEXED_DB.KEYS.loadHistoryKeys, historyItemFileKeys);
+    } catch (ex) {
+      logger.warn('Could not save history item', ex);
+    }
+  }
+
   function handleDownloadRecords(type: 'results' | 'failures') {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const combinedResults: any[] = [];
-    // Use field mapping to determine headers in output data and account for relationship fields
-    const fields = getFieldHeaderFromMapping(fieldMapping);
-
-    processedRecords.forEach((record) => {
-      if (type === 'results' ? true : !record.success) {
-        combinedResults.push({
-          _id: record.success ? record.id : record['Id'] || '',
-          _success: record.success,
-          _errors: record.success === false ? record.errors.map((error) => `${error.statusCode}: ${error.message}`).join('\n') : '',
-          ...flattenRecord(record.record, fields),
-        });
-      }
-    });
-
-    const header = ['_id', '_success', '_errors'].concat(fields);
+    const { data, header } = getRecordsForDownloadBatchApi(type, fieldMapping, processedRecords);
     setDownloadModalData({
       open: true,
-      data: combinedResults,
+      data,
       header,
       fileNameParts: [loadType.toLocaleLowerCase(), selectedSObject.toLocaleLowerCase(), type],
     });
-    trackEvent(ANALYTICS_KEYS.load_DownloadRecords, { loadType, type, numRows: combinedResults.length });
+    trackEvent(ANALYTICS_KEYS.load_DownloadRecords, { loadType, type, numRows: data.length });
   }
 
   function handleViewRecords(type: 'results' | 'failures') {

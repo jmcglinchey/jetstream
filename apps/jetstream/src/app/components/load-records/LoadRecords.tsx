@@ -23,6 +23,7 @@ import { useRecoilState, useRecoilValue, useResetRecoilState } from 'recoil';
 import { applicationCookieState, selectedOrgState, selectedOrgType } from '../../app-state';
 import { useAmplitude } from '../core/analytics';
 import LoadRecordsDataPreview from './components/LoadRecordsDataPreview';
+import LoadRecordsHistoryModal from './components/LoadRecordsHistoryModal';
 import LoadRecordsProgress from './components/LoadRecordsProgress';
 import { FieldWithRelatedEntities, LocalOrGoogle, Step } from './load-records-types';
 import * as fromLoadRecordsState from './load-records.state';
@@ -350,6 +351,7 @@ export const LoadRecords: FunctionComponent<LoadRecordsProps> = ({ featureFlags 
         <PageHeaderRow>
           <PageHeaderTitle icon={{ type: 'standard', icon: 'data_streams' }} label="Load Records" docsPath="/load" />
           <PageHeaderActions colType="actions" buttonType="separate">
+            <LoadRecordsHistoryModal selectedOrg={selectedOrg} />
             <button
               data-testid="start-over-button"
               className="slds-button slds-button_neutral collapsible-button collapsible-button-md"

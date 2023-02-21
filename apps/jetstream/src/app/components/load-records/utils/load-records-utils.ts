@@ -2,8 +2,8 @@ import { logger } from '@jetstream/shared/client-logger';
 import { SFDC_BULK_API_NULL_VALUE } from '@jetstream/shared/constants';
 import { queryAll, queryWithCache } from '@jetstream/shared/data';
 import { describeSObjectWithExtendedTypes, formatNumber } from '@jetstream/shared/ui-utils';
-import { REGEX, transformRecordForDataLoad } from '@jetstream/shared/utils';
-import { EntityParticleRecord, FieldWithExtendedType, MapOf, SalesforceOrgUi } from '@jetstream/types';
+import { flattenRecord, REGEX, transformRecordForDataLoad } from '@jetstream/shared/utils';
+import { EntityParticleRecord, FieldWithExtendedType, MapOf, RecordResultWithRecord, SalesforceOrgUi } from '@jetstream/types';
 import { DescribeGlobalSObjectResult } from 'jsforce';
 import JSZip from 'jszip';
 import groupBy from 'lodash/groupBy';
@@ -373,7 +373,7 @@ export function transformData({ data, fieldMapping, sObject, insertNulls, dateFo
  */
 export async function fetchMappedRelatedRecords(
   data: any,
-  { org, sObject, fieldMapping, apiMode }: PrepareDataPayload,
+  { uuid, org, sObject, fieldMapping, apiMode }: PrepareDataPayload,
   onProgress: (progress: number) => void
 ): Promise<PrepareDataResponse> {
   const nonExternalIdFieldMappings = Object.values(fieldMapping).filter(
@@ -466,7 +466,7 @@ export async function fetchMappedRelatedRecords(
   // remove failed records from dataset
   data = data.filter((_, i: number) => !errorsByRowIndex.has(i));
 
-  return { data, errors: Array.from(errorsByRowIndex.values()), queryErrors };
+  return { uuid, data, errors: Array.from(errorsByRowIndex.values()), queryErrors };
 }
 
 function addErrors(errorsByRowIndex: Map<number, { row: number; record: any; errors: string[] }>) {
@@ -646,4 +646,29 @@ export function prepareCustomMetadata(apiVersion, metadata: MapOfCustomMetadataR
     zip.file(`customMetadata/${fullName}.md`, metadata[fullName].metadata);
   });
   return zip.generateAsync({ type: 'arraybuffer' });
+}
+
+export function getRecordsForDownloadBatchApi(
+  type: 'results' | 'failures',
+  fieldMapping: FieldMapping,
+  processedRecords: RecordResultWithRecord[]
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const combinedResults: any[] = [];
+  // Use field mapping to determine headers in output data and account for relationship fields
+  const fields = getFieldHeaderFromMapping(fieldMapping);
+
+  processedRecords.forEach((record) => {
+    if (type === 'results' ? true : !record.success) {
+      combinedResults.push({
+        _id: record.success ? record.id : record['Id'] || '',
+        _success: record.success,
+        _errors: record.success === false ? record.errors.map((error) => `${error.statusCode}: ${error.message}`).join('\n') : '',
+        ...flattenRecord(record.record, fields),
+      });
+    }
+  });
+
+  const header = ['_id', '_success', '_errors'].concat(fields);
+  return { header, data: combinedResults };
 }

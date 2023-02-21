@@ -29,8 +29,8 @@ import {
   LoadDataPayload,
   PrepareDataPayload,
 } from '../../components/load-records/load-records-types';
-import { fetchMappedRelatedRecords, LoadRecordsBatchError, transformData } from './utils/load-records-utils';
 import { axiosElectronAdapter, initMessageHandler } from '../core/electron-axios-adapter';
+import { fetchMappedRelatedRecords, LoadRecordsBatchError, transformData } from './utils/load-records-utils';
 
 type MessageName = 'isElectron' | 'prepareData' | 'prepareDataProgress' | 'loadData' | 'loadDataStatus';
 // eslint-disable-next-line no-restricted-globals
@@ -53,7 +53,7 @@ async function handleMessage(name: MessageName, payloadData: any, port?: Message
       }
       case 'prepareData': {
         payloadData = payloadData || {};
-        const { data, fieldMapping, sObject, dateFormat, apiMode } = payloadData as PrepareDataPayload;
+        const { uuid, data, fieldMapping, sObject, dateFormat, apiMode } = payloadData as PrepareDataPayload;
         if (!Array.isArray(data) || !fieldMapping || !isString(sObject) || !isString(dateFormat) || !isString(apiMode)) {
           throw new Error('The required parameters were not included in the request');
         }
@@ -85,7 +85,7 @@ async function handleMessage(name: MessageName, payloadData: any, port?: Message
   }
 }
 
-async function loadBulkApiData({ org, data, sObject, type, batchSize, externalId, assignmentRuleId, serialMode }: LoadDataPayload) {
+async function loadBulkApiData({ uuid, org, data, sObject, type, batchSize, externalId, assignmentRuleId, serialMode }: LoadDataPayload) {
   const replyName = 'loadData';
   try {
     const results = await bulkApiCreateJob(org, { type, sObject, serialMode, assignmentRuleId, externalId });
@@ -95,7 +95,7 @@ async function loadBulkApiData({ org, data, sObject, type, batchSize, externalId
       .map((batch) => generateCsv(batch))
       .map((data, i) => ({ data, batchNumber: i, completed: false, success: false }));
 
-    replyToMessage('loadDataStatus', { resultsSummary: getBatchSummary(results, batches) });
+    replyToMessage('loadDataStatus', { uuid, resultsSummary: getBatchSummary(results, batches) });
     let currItem = 1;
     let fatalError = false;
     const loadErrors: Error[] = [];
@@ -119,7 +119,7 @@ async function loadBulkApiData({ org, data, sObject, type, batchSize, externalId
         if (batch.data instanceof ArrayBuffer) {
           transfer = [batch.data];
         }
-        replyToMessage('loadDataStatus', { resultsSummary: getBatchSummary(results, batches) }, null, transfer);
+        replyToMessage('loadDataStatus', { uuid, resultsSummary: getBatchSummary(results, batches) }, null, transfer);
       }
       currItem++;
     }
@@ -139,7 +139,7 @@ async function loadBulkApiData({ org, data, sObject, type, batchSize, externalId
 
     replyToMessage(
       replyName,
-      { jobInfo: jobInfoWithBatches },
+      { uuid, jobInfo: jobInfoWithBatches },
       (fatalError && new LoadRecordsBatchError(`One or more batches failed to load`, loadErrors)) || null
     );
 
@@ -157,7 +157,7 @@ async function loadBulkApiData({ org, data, sObject, type, batchSize, externalId
 }
 
 async function loadBatchApiData(payload: LoadDataPayload) {
-  const { org, sObject, type, externalId, assignmentRuleId } = payload;
+  const { uuid, org, sObject, type, externalId, assignmentRuleId } = payload;
   const replyName = 'loadData';
   try {
     const { batchRecordMap, batches, failedRecords } = await getBatchApiBatches(payload);
@@ -244,12 +244,13 @@ async function loadBatchApiData(payload: LoadDataPayload) {
           })
         );
       } finally {
-        replyToMessage('loadDataStatus', { records: responseWithRecord });
+        replyToMessage('loadDataStatus', { uuid, records: responseWithRecord });
       }
     }
     // Handle and processing failures (these happen when processing binary data)
     if (failedRecords.length) {
       replyToMessage('loadDataStatus', {
+        uuid,
         records: failedRecords.map(
           (record): RecordResultWithRecord => ({
             success: false,
@@ -265,7 +266,7 @@ async function loadBatchApiData(payload: LoadDataPayload) {
         ),
       });
     }
-    replyToMessage(replyName, {});
+    replyToMessage(replyName, { uuid });
   } catch (ex) {
     return replyToMessage(replyName, null, ex);
   }

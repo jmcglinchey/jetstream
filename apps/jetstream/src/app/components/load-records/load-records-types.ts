@@ -69,6 +69,7 @@ export interface FieldMappingItem {
 }
 
 export interface PrepareDataPayload {
+  uuid: string;
   org: SalesforceOrgUi;
   data: any[];
   fieldMapping: FieldMapping;
@@ -79,6 +80,7 @@ export interface PrepareDataPayload {
 }
 
 export interface PrepareDataResponse {
+  uuid: string;
   data: any[];
   errors: PrepareDataResponseError[];
   queryErrors: string[];
@@ -91,6 +93,7 @@ export interface PrepareDataResponse {
 // }
 
 export interface LoadDataPayload {
+  uuid: string;
   org: SalesforceOrgUi;
   data: any[];
   zipData?: ArrayBuffer;
@@ -145,4 +148,40 @@ export interface CustomMetadataRecord {
   metadata: string;
   fullName: string;
   record: any;
+}
+
+export interface LoadHistoryItem {
+  key: string; // org:uuid
+  uuid: string;
+  bulkJobId: string | null;
+  resultsDataId: string | null; // id of other entries
+  date: Date;
+  org: string;
+  sObject: string;
+  apiMode: ApiMode;
+  operation: InsertUpdateUpsertDelete;
+  batchSize: number;
+  serialMode?: boolean;
+  externalId?: string;
+  insertNulls?: boolean;
+  dateFormat: string;
+  assignmentRuleId?: string;
+  fieldMapping: FieldMapping;
+  startTime: string;
+  endTime: string;
+  total: number;
+  success: number;
+  failure: number;
+  errors: PrepareDataResponseError[];
+}
+
+export interface LoadHistoryItemWithOrg extends LoadHistoryItem {
+  orgName: string;
+}
+
+export interface LoadHistoryFileItem {
+  key: string; // org:uuid:type
+  parentUuid: string;
+  type: 'INPUT' | 'RESULTS';
+  data: any[];
 }

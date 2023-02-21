@@ -112,6 +112,8 @@ export const INDEXED_DB = {
   KEYS: {
     automationControlHistory: 'AUTOMATION:QUERY',
     queryHistory: 'HISTORY:QUERY',
+    loadHistory: 'HISTORY:LOAD',
+    loadHistoryKeys: 'HISTORY:LOAD:KEYS',
     apexHistory: 'HISTORY:APEX',
     deployHistory: 'HISTORY:DEPLOY',
     salesforceApiHistory: 'HISTORY:SALESFORCE_API',
