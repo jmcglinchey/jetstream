@@ -240,6 +240,8 @@ export interface ListItem<V = string, M = any> {
   secondaryLabel?: string | null;
   secondaryLabelOnNewLine?: boolean | null;
   metaLabel?: string | null;
+  /** used for flattened virtual lists */
+  isGroup?: Maybe<boolean>;
   value: V;
   title?: string | null;
   meta?: M | null;

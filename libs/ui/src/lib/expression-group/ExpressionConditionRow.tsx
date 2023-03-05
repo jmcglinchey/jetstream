@@ -1,6 +1,6 @@
 import { css } from '@emotion/react';
 import { useDebounce } from '@jetstream/shared/ui-utils';
-import { multiWordObjectFilter } from '@jetstream/shared/utils';
+import { multiWordObjectFilter, getFlattenedListItems } from '@jetstream/shared/utils';
 import {
   AndOr,
   ExpressionConditionHelpText,
@@ -88,6 +88,7 @@ export const ExpressionConditionRow: FunctionComponent<ExpressionConditionRowPro
   }) => {
     const [disableValueInput, setDisableValueInput] = useState(false);
     const [visibleResources, setVisibleResources] = useState<ListItemGroup[]>(resources);
+    const [flattenedResources, setFlattenedResources] = useState<ListItem[]>(() => getFlattenedListItems(resources));
     const [selectedResourceType, setSelectedResourceType] = useState<ListItem<ExpressionRowValueType>[]>();
     const [resourcesFilter, setResourcesFilter] = useState<string | null>(null);
     const [selectedValue, setSelectValue] = useState(selected.value);
@@ -178,6 +179,10 @@ export const ExpressionConditionRow: FunctionComponent<ExpressionConditionRowPro
       }
     }, [resources, resourcesFilter]);
 
+    useEffect(() => {
+      setFlattenedResources(getFlattenedListItems(visibleResources));
+    }, [visibleResources]);
+
     function handleSelectedResource(type: ListItem<ExpressionRowValueType>[]) {
       setSelectedResourceType(type);
       if (type && type[0] && selected.resourceType !== type[0].value) {
@@ -244,6 +249,9 @@ export const ExpressionConditionRow: FunctionComponent<ExpressionConditionRowPro
                   }
                 }}
               >
+                {/* {flattenedResources.map((item) => (
+
+                ))} */}
                 {visibleResources
                   .filter((group) => group.items.length > 0)
                   .map((group) => (
