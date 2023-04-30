@@ -19,6 +19,7 @@ import { atom, selector, useRecoilValue, useSetRecoilState } from 'recoil';
 export const STORAGE_KEYS = {
   SELECTED_ORG_STORAGE_KEY: `SELECTED_ORG`,
   ANONYMOUS_APEX_STORAGE_KEY: `ANONYMOUS_APEX`,
+  ANONYMOUS_APEX_ACTIVE_TAB_STORAGE_KEY: `ANONYMOUS_APEX_ACTIVE_TAB`,
 };
 
 /**

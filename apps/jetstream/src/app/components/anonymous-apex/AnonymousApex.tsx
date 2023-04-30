@@ -3,7 +3,7 @@ import { useSetTraceFlag } from '@jetstream/connected-ui';
 import { logger } from '@jetstream/shared/client-logger';
 import { ANALYTICS_KEYS, INDEXED_DB, LOG_LEVELS, TITLES } from '@jetstream/shared/constants';
 import { anonymousApex } from '@jetstream/shared/data';
-import { useBrowserNotifications, useDebounce, useNonInitialEffect, useRollbar, useTitle } from '@jetstream/shared/ui-utils';
+import { useBrowserNotifications, useNonInitialEffect, useRollbar, useTitle } from '@jetstream/shared/ui-utils';
 import { SplitWrapper as Split } from '@jetstream/splitjs';
 import { ApexHistoryItem, ListItem, MapOf, SalesforceOrgUi } from '@jetstream/types';
 import {
@@ -24,11 +24,12 @@ import escapeRegExp from 'lodash/escapeRegExp';
 import type { editor } from 'monaco-editor';
 import { Fragment, FunctionComponent, MouseEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useRecoilState, useRecoilValue } from 'recoil';
-import { STORAGE_KEYS, applicationCookieState, selectedOrgState } from '../../app-state';
+import { applicationCookieState, selectedOrgState } from '../../app-state';
 import { useAmplitude } from '../core/analytics';
+import AnonymousApexEditorTabs from './AnonymousApexEditorTabs';
 import AnonymousApexFilter from './AnonymousApexFilter';
-import AnonymousApexHistory from './AnonymousApexHistory';
 import * as fromApexState from './apex.state';
+import { useEditorTabs } from './useEditorTabs';
 
 // import { useApexCompletions } from './useApexCompletions';
 
@@ -54,7 +55,7 @@ export const AnonymousApex: FunctionComponent<AnonymousApexProps> = () => {
   const rollbar = useRollbar();
   const [{ serverUrl }] = useRecoilState(applicationCookieState);
   const selectedOrg = useRecoilValue<SalesforceOrgUi>(selectedOrgState);
-  const [apex, setApex] = useState(() => localStorage.getItem(STORAGE_KEYS.ANONYMOUS_APEX_STORAGE_KEY) || '');
+  // const [apex, setApex] = useState(() => localStorage.getItem(STORAGE_KEYS.ANONYMOUS_APEX_STORAGE_KEY) || '');
   const [results, setResults] = useState('');
   const [resultsStatus, setResultsStatus] = useState<{ hasResults: boolean; success: boolean; label: string | null }>({
     hasResults: false,
@@ -63,7 +64,7 @@ export const AnonymousApex: FunctionComponent<AnonymousApexProps> = () => {
   });
   const [loading, setLoading] = useState(false);
   const [historyItems, setHistoryItems] = useRecoilState(fromApexState.apexHistoryState);
-  const debouncedApex = useDebounce(apex, 1000);
+  // const debouncedApex = useDebounce(apex, 1000);
   const monaco = useMonaco();
 
   /** Add trace for 1 hour so that any background jobs are logged even if dev console is not open */
@@ -74,6 +75,10 @@ export const AnonymousApex: FunctionComponent<AnonymousApexProps> = () => {
   const [userDebug, setUserDebug] = useState(false);
   const [textFilter, setTextFilter] = useState<string>('');
   const [visibleResults, setVisibleResults] = useState<string>('');
+
+  const { activeTab, addTab, deleteTab, setActiveTab, setValue, tabs } = useEditorTabs();
+
+  const { value: apex } = activeTab;
 
   useEffect(() => {
     isMounted.current = true;
@@ -89,9 +94,9 @@ export const AnonymousApex: FunctionComponent<AnonymousApexProps> = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [textFilter, logRef.current]);
 
-  useNonInitialEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ANONYMOUS_APEX_STORAGE_KEY, debouncedApex);
-  }, [debouncedApex]);
+  // useNonInitialEffect(() => {
+  //   localStorage.setItem(STORAGE_KEYS.ANONYMOUS_APEX_STORAGE_KEY, debouncedApex);
+  // }, [debouncedApex]);
 
   useNonInitialEffect(() => {
     if (apex) {
@@ -186,7 +191,7 @@ export const AnonymousApex: FunctionComponent<AnonymousApexProps> = () => {
   );
 
   function handleEditorChange(value, event) {
-    setApex(value);
+    setValue(value);
   }
 
   const handleApexEditorMount: OnMount = (currEditor, monaco) => {
@@ -272,8 +277,20 @@ export const AnonymousApex: FunctionComponent<AnonymousApexProps> = () => {
                 >
                   Open developer console
                 </SalesforceLogin>
-                <AnonymousApexHistory onHistorySelected={setApex} />
+                {/* FIXME: we removed this, should we add it back? */}
+                {/* <AnonymousApexHistory
+                  onHistorySelected={() => {
+                    //
+                  }}
+                /> */}
               </Grid>
+              <AnonymousApexEditorTabs
+                tabs={tabs}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                addTab={addTab}
+                deleteTab={deleteTab}
+              />
               <Editor
                 height="80vh"
                 theme="vs-dark"
