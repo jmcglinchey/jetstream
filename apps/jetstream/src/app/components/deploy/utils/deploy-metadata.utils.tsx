@@ -68,6 +68,7 @@ export async function getHistoryItemFile(item: SalesforceDeployHistoryItem) {
 export async function saveHistory({
   sourceOrg,
   destinationOrg,
+  deploymentHistoryName,
   type,
   start,
   metadata,
@@ -77,6 +78,7 @@ export async function saveHistory({
 }: {
   sourceOrg?: SalesforceOrgUi;
   destinationOrg: SalesforceOrgUi;
+  deploymentHistoryName?: string | undefined;
   type: SalesforceDeployHistoryType;
   start: Date;
   metadata?: MapOf<ListMetadataResult[]>;
@@ -84,6 +86,7 @@ export async function saveHistory({
   results?: DeployResult;
   file?: ArrayBuffer | string | null;
 }) {
+  console.log('deploymentHistoryName:', deploymentHistoryName);
   try {
     if (file && isString(file)) {
       try {
@@ -108,6 +111,7 @@ export async function saveHistory({
         label: destinationOrg.label,
         orgName: destinationOrg.orgName || '',
       },
+      deploymentHistoryName: deploymentHistoryName,
       start,
       finish: new Date(),
       url: results?.id ? getDeploymentStatusUrl(results.id) : null,

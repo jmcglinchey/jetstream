@@ -20,6 +20,12 @@ const COLUMNS: ColumnWithFilter<SalesforceDeployHistoryItem>[] = [
     width: 200,
   },
   {
+    ...setColumnFromType('name', 'text'),
+    name: 'Deployment History Name',
+    key: 'deploymentHistoryName',
+    width: 165,
+  },
+  {
     ...setColumnFromType('type', 'text'),
     name: 'Type',
     key: 'type',
@@ -84,6 +90,7 @@ export const DeployMetadataHistoryTable: FunctionComponent<DeployMetadataHistory
   onView,
   onDownload,
 }) => {
+  console.log('items:', items);
   const context: DeployHistoryTableContext = useMemo(
     () => ({ orgsById, portalRefForFilters: modalRef, onView, onDownload }),
     [orgsById, modalRef, onView, onDownload]

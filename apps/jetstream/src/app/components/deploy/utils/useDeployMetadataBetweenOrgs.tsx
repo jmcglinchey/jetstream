@@ -124,6 +124,7 @@ export function useDeployMetadataBetweenOrgs(
           saveHistory({
             sourceOrg,
             destinationOrg,
+            deploymentHistoryName: 'test 2',
             type: 'orgToOrg',
             start,
             metadata: selectedMetadata,

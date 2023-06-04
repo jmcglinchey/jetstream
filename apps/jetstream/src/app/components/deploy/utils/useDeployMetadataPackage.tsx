@@ -114,7 +114,7 @@ export function useDeployMetadataPackage(destinationOrg: SalesforceOrgUi, deploy
             },
           });
           dispatch({ type: 'SUCCESS', payload: { results } });
-          saveHistory({ destinationOrg, type: deployType, start, deployOptions, results, file });
+          saveHistory({ destinationOrg, deploymentHistoryName: 'test3', type: deployType, start, deployOptions, results, file });
           if (results.success) {
             notifyUser(`Deployment finished successfully`, {
               body: getNotificationMessageBody(results),
