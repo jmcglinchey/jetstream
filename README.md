@@ -1,4 +1,6 @@
 # Jetstream
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fjmcglinchey%2Fjetstream.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fjmcglinchey%2Fjetstream?ref=badge_shield)
+
 
 <img src="./jetstream-logo-white-plate.png" />
 
@@ -198,3 +200,7 @@ Packaging can only be done by resources that have access to the Apple Developer 
 - Apple
   - https://kilianvalkhof.com/2019/electron/notarizing-your-electron-application/
   - https://www.electronjs.org/docs/latest/tutorial/mac-app-store-submission-guide
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fjmcglinchey%2Fjetstream.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fjmcglinchey%2Fjetstream?ref=badge_large)
